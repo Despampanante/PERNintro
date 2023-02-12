@@ -1,10 +1,30 @@
-const express = require("express");
-const app = express();
 const cors = require("cors");
 const pool = require("./db");
 
+var fs = require('fs');
+var http = require('http');
+var https = require('https');
+var express = require('express');
+var app = express();
+
+const privateKey = fs.readFileSync('/etc/letsencrypt/live/antisago.com/privkey.pem', 'utf8');
+const certificate = fs.readFileSync('/etc/letsencrypt/live/antisago.com/cert.pem', 'utf8');
+const ca = fs.readFileSync('/etc/letsencrypt/live/antisago.com/chain.pem', 'utf8');
+
+var credentials = {key: privateKey, cert: certificate, ca: ca};
+
+// your express configuration here
+//
+
+
 //middleware
-app.use(cors());
+var corsMiddleware = function(req, res, next) {
+	res.header('Access-Control-Allow-Origin', 'localhost'); //replace localhost with actual host
+	res.header('Access-Control-Allow-Methods', 'OPTIONS, GET, PUT, PATCH, POST, DELETE');
+	res.header('Access-Control-Allow-Headers', 'Content-Type, X-Requested-With, Authorization');
+	next();
+}
+app.use(corsMiddleware);
 app.use(express.json()); //req.body
 
 //ROUTES//
@@ -26,7 +46,7 @@ app.post("/todos", async(req, res) => {
 //get all todos
 app.get("/todos", async(req, res) => {
     try {
-        const allTodos = await pool.query("SELECT * FROM todo");
+        const allTodos = await pool.query("SELECT * FROM todo ORDER BY todo_id");
         res.json(allTodos.rows);
     } catch (err) {
         console.error(err.message);
@@ -73,6 +93,8 @@ app.delete("/todos/:id", async(req, res) => {
     }
 })
 
-app.listen(5000, () => {
-    console.log("Server had started on port 5000");
-})
+var httpServer = http.createServer(app);
+var httpsServer = https.createServer(credentials, app);
+
+httpsServer.listen(5000);
+
